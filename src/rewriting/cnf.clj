@@ -6,55 +6,139 @@
   (and (symbol? x)
        (= (subs (str x) 0 1) "?")))
 
+(defn ref? [x]
+  (and (keyword? x) x))
+
 (defn lvar? [x]
   (and (symbol? x)
-       (= (subs (str x) 0 1) "L")
-       (Integer/parseInt (subs (str x) 1)) ))
+       (> (count (str x)) 2)
+       (= (subs (str x) 0 2) "L_")
+       (Integer/parseInt (subs (str x) 2))))
 
 (defn get-fact [facts x]
-  (when-let [lvar (lvar? x)]
-    (nth facts (- lvar 1))))
+  (->> x
+       ref?
+       (get facts)
+       :fact))
+
+(defn get-line [proof x]
+  (when-let [line-num (lvar? x)]
+    (nth proof (- line-num 1))))
 
 (defn subst [old new data]
   (clojure.walk/prewalk-replace {old new} data))
 
-(defn assm [facts step]
-  (conj facts step))
+(defn assm [{:keys [facts proof] :as sys} step]
+  (update sys :proof #(conj % step)))
 
-(defn specify [facts line step]
-  (when-let [fact (get-fact facts line)]
-    (conj facts (reduce (fn [acc [old new]] (subst old (or (get-fact facts new) new) acc))
-                        fact
-                        step))))
+(defn specify [{:keys [facts proof] :as sys} line step]
+  (when-let [line (or (get-line proof line)
+                      (get-fact facts line))]
+    (update sys :proof
+            #(conj % (reduce (fn [acc [old new]]
+                               (subst old (or
+                                           (get-fact facts new)
+                                           (get-line proof new)
+                                           new)
+                                      acc))
+                             line
+                             step)))))
 
-(defn construct [facts op clauses]
-  (let [clauses (map (fn [clause] (or (get-fact facts clause) clause)) clauses)]
+(defn construct [{:keys [facts proof] :as sys} op clauses]
+  (let [clauses (map (fn [clause] (or (get-fact facts clause)
+                                     (get-line proof clause)
+                                     clause))
+                     clauses)]
     (case op
-      or (when (some (fn [clause] ((set facts) clause)) clauses)
-           (conj facts (vec (concat [op] clauses))))
+      or (when (some (fn [clause] ((clojure.set/union
+                                   (set proof)
+                                   (set (map :fact (vals facts))))
+                                  clause)) clauses)
+           (update sys :proof #(conj % (vec (concat [op] clauses)))))
       )
     ))
 
-(defn modus-ponens [facts p1 impl]
-  (let [[_ from to] (get-fact facts impl)
-        p1 (get-fact facts p1)]
+(defn modus-ponens [{:keys [facts proof] :as sys} p1 impl]
+  (let [[_ from to] (or (get-fact facts impl)
+                        (get-line proof impl))
+        p1 (or (get-fact facts p1)
+               (get-line proof p1))]
     (if (= from p1)
-      (conj facts to)
+      (update sys :proof #(conj % to))
       nil)))
 
-(defn contradiction [facts p1 p2]
-  (let [p1 (get-fact facts p1)
-        p2 (get-fact facts p2)]
+(defn contradiction [{:keys [facts proof] :as sys} p1 p2]
+  (let [p1 (or (get-fact facts p1) (get-line proof p1))
+        p2 (or (get-fact facts p2) (get-line proof p2))]
     (when (or (= p1 ['not p2])
               (= p2 ['not p1]))
-      (conj facts ['contradicts p1 p2]))))
+      (update sys :proof #(conj % ['contradicts p1 p2])))))
 
-;; (defn pretty-print [facts descriptions]
-;;   (let [proof (map (fn [f d] (str f " -- " d))
-;;                    facts descriptions)]
-;;     (clojure.pprint/pprint (vec proof))
-;;     facts))
 
+
+(defn prove [facts steps]
+  (reduce
+   (fn [acc step]
+     (apply (first step) (cons acc (rest step))))
+   {:facts facts :proof []}
+   steps))
+
+(defn pretty-print [name fact]
+  (newline)
+  (println (str "Name: " name))
+  (println (str "Fact: " (:fact fact)))
+  (println "Proof: ")
+  (map-indexed (fn [idx {:keys [step line]}]
+                 (println (str (+ 1 idx) " -- " step))
+                 (println line))
+               (:proof fact)))
+
+(defn make-system [facts]
+  (fn [operation & args]
+    (case operation
+      list-axioms (mapv second (filter (fn [[_ fact]] (= (:proof fact) :axiom)) facts))
+      prove
+      (let [name (first args)
+            fact (second args)
+            proof-attempt (prove facts (nthrest args 2))]
+        (if proof-attempt
+          (make-system (assoc facts name
+                              {:fact fact
+                               :proof
+                               (mapv (fn [c p]
+                                       {:step c
+                                        :line p})
+                                     (nthrest args 2)
+                                     (:proof proof-attempt))}))
+          ['FAIL proof-attempt]))
+      proof (:proof (get facts (first args)))
+      pretty-print (pretty-print (first args) (get facts (first args))))))
+
+
+(def sys (make-system {:3-elem-x
+                       {:fact '[elem 3 x]
+                        :proof :axiom}
+                       :4-elem-y
+                       {:fact '[elem 4 y]
+                        :proof :axiom}
+                       :union-defn
+                       {:fact '[implies
+                                [or [elem ?A ?S1] [elem ?A ?S2]]
+                                [elem ?A [union ?S1 ?S2]]]
+                        :proof :axiom}}))
+
+(sys 'list-axioms)
+
+(def new-sys (sys 'prove :elem-4-union-x-y '[elem 4 [union x y]]
+                  [assm '[not [elem 4 [union x y]]]]
+                  [specify :union-defn '{?A 4 ?S1 x ?S2 y}]
+                  [construct 'or '[[elem 4 x] :4-elem-y]]
+                  [modus-ponens 'L_3 'L_2]
+                  [contradiction 'L_1 'L_4]))
+
+(new-sys 'proof :elem-4-union-x-y)
+
+(new-sys 'pretty-print :elem-4-union-x-y)
 
 ;; Theory is just a list of ever-growing proven facts (they never shrink)
 ;; Facts have names, derivations (added by the proof function)
@@ -67,57 +151,6 @@
 ;;    :fact axiom
 ;;    :proof :axiom})
 
-(defn prove [facts steps]
-  (reduce
-   (fn [acc step]
-     (apply (first step) (cons (vec acc) (rest step))))
-   facts
-   steps))
-
-(defn make-system [facts]
-  (fn [operation & args]
-    (case operation
-      list-axioms (filterv (fn [f] (= (:proof f) :axiom)) facts)
-      prove
-      (let [name (first args)
-            fact (second args)
-            proof-attempt (prove (map :fact facts) (nthrest args 2))]
-        (if proof-attempt
-          (conj facts
-                {:name name
-                 :fact fact
-                 :proof (nthrest args 2)})
-          ['FAIL proof-attempt])))))
-
-
-(def sys (make-system [{:name "3-elem-x"
-                        :fact '[elem 3 x]
-                        :proof :axiom}
-                       {:name "4-elem-y"
-                        :fact '[elem 4 y]
-                        :proof :axiom}
-                       {:name "union-defn"
-                        :fact '[implies
-                                [or [elem ?A ?S1] [elem ?A ?S2]]
-                                [elem ?A [union ?S1 ?S2]]]
-                        :proof :axiom}]))
-
-(sys 'list-axioms)
-
-;; (sys 'prove
-;;      '[elem 4 [union x y]]
-;;      '[(assm [not [elem 4 [union x y]]])
-;;        (specify L3 {?A 4 ?S1 x ?S2 y})
-;;        (construct or [[elem 4 x] L2])
-;;        (modus-ponens L6 L5)
-;;        (contradiction L7 L4)])
-
-(sys 'prove "Elem 4 union x y" '[elem 4 [union x y]]
-     [assm '[not [elem 4 [union x y]]]]
-     [specify 'L3 '{?A 4 ?S1 x ?S2 y}]
-     [construct 'or '[[elem 4 x] L2]]
-     [modus-ponens 'L6 'L5]
-     [contradiction 'L7 'L4])
 
 ;; An integer n is called even if and only if there exists
 ;; an integer k such that n=2k.

@@ -79,7 +79,14 @@
 (defn prove [facts steps]
   (reduce
    (fn [acc step]
-     (apply (first step) (cons acc (rest step))))
+     (apply
+      (case (first step)
+        construct construct
+        assm assm
+        specify specify
+        modus-ponens modus-ponens
+        contradiction contradiction)
+      (cons acc (rest step))))
    {:facts facts :proof []}
    steps))
 
@@ -130,11 +137,11 @@
 (sys 'list-axioms)
 
 (def new-sys (sys 'prove :elem-4-union-x-y '[elem 4 [union x y]]
-                  [assm '[not [elem 4 [union x y]]]]
-                  [specify :union-defn '{?A 4 ?S1 x ?S2 y}]
-                  [construct 'or '[[elem 4 x] :4-elem-y]]
-                  [modus-ponens 'L_3 'L_2]
-                  [contradiction 'L_1 'L_4]))
+                  ['assm '[not [elem 4 [union x y]]]]
+                  ['specify :union-defn '{?A 4 ?S1 x ?S2 y}]
+                  ['construct 'or '[[elem 4 x] :4-elem-y]]
+                  ['modus-ponens 'L_3 'L_2]
+                  ['contradiction 'L_1 'L_4]))
 
 (new-sys 'proof :elem-4-union-x-y)
 

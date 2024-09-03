@@ -69,9 +69,13 @@ We might have the following proof system
 And we might try to `prove` that 4 is an element of the union by contradiction using commands
 
 ['assm '[not [elem 4 [union x y]]]]  -- valid since we can assume anything
+
 ['specify :union-defn {?A 4 ?S1 y ?S2 x}]  -- valid since we can specify anything holistically
+
 ['fol-eval *L2 (list 1)]  -- valid since we can naively eval simple FOL statements.
+
 ['rewrite *L2 'LHS *L3 nil]  -- The famous Modus Ponens relation
+
 ['contradict *L4 *L1] -- The theorem is contradicted
 
 This should work just fine and deliver us the new fact

@@ -1,5 +1,5 @@
 
-Equational term-rewriting system to aid with visibility and debugging of proofs. NOT an automatic theorem prover, just a rewriting tool + proof validation
+Equational term-rewriting system to aid with visibility and debugging of proofs. NOT an automatic theorem prover, just a rewriting tool for pedagogical proof validation
 
 ## TODO
 
@@ -19,7 +19,9 @@ Underpinning this undertaking is the fundamental idea that process is more impor
 ## Literature
 
 'Term Rewriting and All That'
+
 'Computer Aided Reasoning - An Approach'
+
 'Automated Reasoning about Set-Point Topology'
 
 ## Implementation

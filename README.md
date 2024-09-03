@@ -8,6 +8,7 @@ Equational term-rewriting system to aid with visibility and debugging of proofs.
 - composition examples
 - strategies
 - tests
+- change the example to use implication explicitly
 
 ## Philosophy
 
@@ -39,12 +40,11 @@ Commands:
   - Can be holistic or otherwise substitution/unification
   - Can eval FOL (and/or/implies)
   - For implication theorems, can make assumptions and prove by contra
-  - Begin a subproof
   
 A subproof may functionally just be 'I am asking this question, can you store this as a thing that I can do rewrites on'. Not sure I actually need subproofs yet! Hopefully not.
 
 
-Example
+## Example
 
 We might have the following proof system
 

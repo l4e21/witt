@@ -174,6 +174,7 @@
 ;;                            [or [elem 4 y] [elem 4 x]]
 ;;                            3]}]}
 ;;          ['rewrite :a 'LHS '*L1 (list 1)])
+
 (clojure.pprint/pprint
  (:elem-4-union-x-y
   (prove :elem-4-union-x-y '[elem 4 [union x y]]

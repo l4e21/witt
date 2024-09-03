@@ -14,6 +14,8 @@ Equational term-rewriting system to aid with visibility and debugging of proofs.
 
 In the Philosophical Investigations, Wittgenstein tells us that it makes no sense to ask 'what the definition' of a concept is, only to give examples. It is with this philosophy in mind that I've produced this 'proof debugger' -- NOT to prove things on its own at all, but simply to allow humans to produce human-readable proofs that the machine will verify, and to thereby produce composable packages of verifiable proofs using equational logic.
 
+Underpinning this undertaking is the fundamental idea that process is more important than outcome. This won't help you prove your programs. It's a purely pedagogical mathematics tool.
+
 ## Literature
 
 'Term Rewriting and All That'

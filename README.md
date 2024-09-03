@@ -4,7 +4,7 @@ Equational term-rewriting system to aid with visibility and debugging of proofs.
 ## TODO
 
 - fol-construct command
-- induce command
+- induce command (partial ordering)
 - composition examples
 - strategies
 - tests
@@ -19,8 +19,9 @@ In the Philosophical Investigations, Wittgenstein tells us that it makes no sens
 'Computer Aided Reasoning - An Approach'
 'Automated Reasoning about Set-Point Topology'
 
-
 ## Implementation
+
+Main file is `equational.clj`
 
 Proof System is just a list of facts
 

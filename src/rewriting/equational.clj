@@ -175,6 +175,7 @@
 ;;                            3]}]}
 ;;          ['rewrite :a 'LHS '*L1 (list 1)])
 
+(clojure.pprint/pprint "")
 (clojure.pprint/pprint
  (:elem-4-union-x-y
   (prove :elem-4-union-x-y '[elem 4 [union x y]]
@@ -196,3 +197,5 @@
                    [or [elem ?A ?S1] [elem ?A ?S2]]
                    [elem ?A [union ?S1 ?S2]]]
            :proof :axiom}})))
+(clojure.pprint/pprint "")
+

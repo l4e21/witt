@@ -31,6 +31,9 @@
   "Either retrieve the axiom, or the line of a proof, or nil"
   (or (get-axiom axioms ref) (get-line proof ref)))
 
+(defn get-fn [{:keys [fns]} ref]
+  (and (symbol? ref) (ref fns)))
+
 (defn subst [old new data]
   "Substitute bindings for new ones"
   (clojure.walk/prewalk-replace {old new} data))
@@ -106,18 +109,16 @@
                       (set (map :fact (vals axioms))))
                      clause)) clauses))
 
-(defn fol-eval [sys command]
+;; This should be replaced with an evaluation and functions should have their own point in the system
+(defn evaluate [sys command]
   "Evaluate simple logical equations in line or axiom"
   (let [dive-point (nth command 2)
         equation (dive (get-line-or-axiom sys (second command)) dive-point)
-        op (first equation)
-        clauses (rest equation)]
+        operation (get-fn sys (first equation))]
     (update sys :proof #(conj % {:command command
-                                 :step (case op
-                                         or
-                                         (if fol-or-clauses
-                                           equation
-                                           'FAIL))}))))
+                                 :step (if operation
+                                         (operation sys equation)
+                                         'FAIL)}))))
 
 
 (defn apply-rewrite [lhs rhs old-term]
@@ -151,10 +152,10 @@
              (case (first command)
                assume (assume sys command)
                specify (specify sys command)
-               fol-eval (fol-eval sys command)
+               evaluate (evaluate sys command)
                rewrite (rewrite sys command)
                sys)))
-         {:axioms system :proof []}
+         {:fns (:fns system) :axioms (:facts system) :proof []}
          commands)]
     (if (= 'FAIL (:step (last (:proof proof-attempt))))
       'FAIL
@@ -175,6 +176,7 @@
 ;;                            3]}]}
 ;;          ['rewrite :a 'LHS '*L1 (list 1)])
 
+
 (clojure.pprint/pprint "")
 (clojure.pprint/pprint
  (:elem-4-union-x-y
@@ -182,20 +184,30 @@
          ;; Commands
          [['assume '[not [elem 4 [union x y]]]]
           ['specify :union-defn '{?A 4 ?S1 x ?S2 y}]
-          ['fol-eval '*L2 (list 1)]
+          ['evaluate '*L2 (list 1)]
           ['rewrite '*L2 'LHS '*L3 nil]
           ['contradict '*L4 '*L1]]
          ;; Proof System
-         {:3-elem-x
-          {:fact '[elem 3 x]
-           :proof :axiom}
-          :4-elem-y
-          {:fact '[elem 4 y]
-           :proof :axiom}
-          :union-defn
-          {:fact '[equal
-                   [or [elem ?A ?S1] [elem ?A ?S2]]
-                   [elem ?A [union ?S1 ?S2]]]
-           :proof :axiom}})))
+         {:fns
+          ;; We do have to have some basic evaluator, just because FOL is required as a baseline for all of this work, and maybe the user wants to extend in the future.
+          {'or (fn [{:keys [axioms fns proof]} equation]
+                 (if (some (fn [clause] ((clojure.set/union
+                                         (set proof)
+                                         (set (map :fact (vals axioms))))
+                                        clause)) (rest equation))
+                   equation
+                   'FAIL))}
+          :facts
+          {:3-elem-x
+           {:fact '[elem 3 x]
+            :proof :axiom}
+           :4-elem-y
+           {:fact '[elem 4 y]
+            :proof :axiom}
+           :union-defn
+           {:fact '[equal
+                    [or [elem ?A ?S1] [elem ?A ?S2]]
+                    [elem ?A [union ?S1 ?S2]]]
+            :proof :axiom}}})))
 (clojure.pprint/pprint "")
 

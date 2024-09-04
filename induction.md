@@ -42,6 +42,7 @@ becomes
 
 '[clojure.core/and [clojure.core/integer? ?a] [clojure.core/integer? ?b] [clojure.core/< ?a ?b]] because first it looks everything up depth-first and unifies and substitutes and blah blah. Now when everything's done it should just evaluate in an evaluator. This way we can evaluate things when we want to and then add an `equal` at the end. That's okay I guess. Are there edge cases? Well, what if parts aren't unified? Then we can just partially evaluate them maybe?
 
+What probably I will need to do is perform a partial evaluation first via a DFS (handling variables as appropriate) 
 
 
 2. We can eschew types entirely, keeping everything relational, forcing the user to define explicitly the orders they care about. This keeps things highly transparent. This seems tedious, and it is computationally more intensive and slower as well as not handling all numbers, but there are methods to make this easier for the user. E.G.,
@@ -54,3 +55,6 @@ Would add
 '[nat-order 1 2] to our list of facts.
 
 Then our induction would prove for a 'base case' by finding the case for the leftmosts in all cases by recursively looking through the facts list, and then for all the leftmosts it must perform the induction steps treating them as base-cases. This is  
+
+
+Probably this all implies that we need to try adding evaluation first.

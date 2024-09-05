@@ -99,8 +99,14 @@
 
 ;; (unify '[or [elem ?e ?S1] [elem ?e ?S2]] '[or [elem 4 y] [elem 4 x]] {})
 ;; (unify '[succ :nat ?n] '[succ :nat ?n] {})
-(breadth-first-unify '[succ :nat ?n] '[+ [succ :nat ?n] [1 2 [succ :nat ?n]]] {})
-(breadth-first-unify '[succ :nat ?n] '[equal X [/ [* [succ :nat ?n] [+ 1 [succ :nat ?n]]] 2]] {})
+
+;; (breadth-first-unify '[succ :nat ?n] '[+ [succ :nat ?n] [1 2 [succ :nat ?n]]] {})
+;; (breadth-first-unify '[succ :nat ?n] '[equal X [/ [* [succ :nat ?n] [+ 1 [succ :nat ?n]]] 2]] {})
+
+(defn find-by-equation [sys equation]
+  (clojure.pprint/pprint "Finding equation")
+  (filter (fn [fact] (= fact equation))
+          (map :fact (vals (:axioms sys)))))
 
 (defn dive [equation location]
   "Dive into a term's subterms a la ACL2"
@@ -178,6 +184,30 @@
   "Construct a symbol that represents a term"
   ['equal (second command) (nth command 2)])
 
+(defn induce [sys command]
+  (clojure.pprint/pprint "Proving theorem by induction") 
+  ;; (clojure.pprint/pprint command)
+  (let [base-bindings (second command)
+        delta-bindings (nth command 2)
+        theorem (nth command 3)
+        base-case (reduce (fn [acc [old new]]
+                            ;; (clojure.pprint/pprint acc)
+                            (subst old new acc))
+                          theorem
+                          base-bindings)
+
+        inductive-case (reduce (fn [acc [old new]]
+                                 ;; (clojure.pprint/pprint acc)
+                                 (subst old new acc))
+                               theorem
+                               delta-bindings)]
+    (if (and (seq (find-by-equation sys base-case))
+             (seq (find-by-equation sys ['implies theorem inductive-case])))
+      theorem)))
+
+(defn apply-induction [sys command]
+  (let ))
+
 (defn prove [name equation commands system]
   "Proof dispatch"
   (let [proof-attempt
@@ -192,6 +222,7 @@
                      evaluate (evaluate sys command)
                      rewrite (rewrite sys command)
                      construct (construct sys command)
+                     induce (induce sys command)
                      sys)]
                (update sys :proof #(conj % {:command command
                                             :step proof-step})))))
@@ -308,46 +339,50 @@
 (clojure.pprint/pprint "")
 
 (def inductive-case-theorem
-  (:sum-n-implies-n-plus-1-theorem
-   (:facts
-    (prove :sum-n-implies-n-plus-1-theorem '[implies
-                                             [equal [sum ?n] [/ [* ?n [+ 1 ?n]] 2]]
-                                             [equal [sum [succ ?n]]
-                                              [/ [* [succ :nat ?n]
-                                                  [+ 1 [succ :nat ?n]]]
-                                               2]]]
-           ;; show equal to + n [/ [* ?n [+ 1 ?n]] 2]
-           [['assume '[equal [sum n] [/ [* n [+ 1 n]] 2]] ]
-            ;; Construct intermediate symbol
-            ['construct 'X '[/ [* [succ :nat n]
-                                [+ 1 [succ :nat n]]]
-                             2]]
-            ;; Rewrite succ n to n + 1 in the formula
-            ['rewrite :1-plus-1 'RHS '*L2 nil]
-            ;; Quadratic-expansion
-            ['rewrite :quadratic-expansion 'LHS '*L3 nil]
-            ['rewrite :commutativity-of-* 'LHS '*L4 (list 2 1 3)]
-            ['rewrite :1-*-n-n 'LHS '*L5 nil]
-            ['rewrite :1-*-n-n 'LHS '*L6 nil]
-            ['rewrite :1-*-n-n 'LHS '*L7 nil]
-            ['rewrite :addition-expansion 'LHS '*L8 nil]
-            ['rewrite :division-by-two 'LHS '*L9 nil]
-            ['rewrite '*L1 'RHS '*L10 (list 2 2)]
-            ['rewrite '*L2 'LHS '*L11 nil]
-            ['rewrite :sum-fact-def 'LHS '*L12 nil]
-            ['rewrite :commutativity-of-equal 'LHS '*L13 nil]
-            ;; ['rewrite '*L1 'RHS '*L11 nil]
-            ]
-           sum-1-theorem))))
+  (prove :sum-n-implies-n-plus-1-theorem '[implies
+                                           [equal [sum ?n] [/ [* ?n [+ 1 ?n]] 2]]
+                                           [equal [sum [succ :nat ?n]]
+                                            [/ [* [succ :nat ?n]
+                                                [+ 1 [succ :nat ?n]]]
+                                             2]]]
+         ;; show equal to + n [/ [* ?n [+ 1 ?n]] 2]
+         [['assume '[equal [sum n] [/ [* n [+ 1 n]] 2]] ]
+          ;; Construct intermediate symbol
+          ['construct 'X '[/ [* [succ :nat n]
+                              [+ 1 [succ :nat n]]]
+                           2]]
+          ;; Rewrite succ n to n + 1 in the formula
+          ['rewrite :1-plus-1 'RHS '*L2 nil]
+          ;; Quadratic-expansion
+          ['rewrite :quadratic-expansion 'LHS '*L3 nil]
+          ['rewrite :commutativity-of-* 'LHS '*L4 (list 2 1 3)]
+          ['rewrite :1-*-n-n 'LHS '*L5 nil]
+          ['rewrite :1-*-n-n 'LHS '*L6 nil]
+          ['rewrite :1-*-n-n 'LHS '*L7 nil]
+          ['rewrite :addition-expansion 'LHS '*L8 nil]
+          ['rewrite :division-by-two 'LHS '*L9 nil]
+          ['rewrite '*L1 'RHS '*L10 (list 2 2)]
+          ['rewrite '*L2 'LHS '*L11 nil]
+          ['rewrite :sum-fact-def 'LHS '*L12 nil]
+          ['rewrite :commutativity-of-equal 'LHS '*L13 nil]
+          ;; ['rewrite '*L1 'RHS '*L11 nil]
+          ]
+         sum-1-theorem))
 
 (clojure.pprint/pprint "")
 (clojure.pprint/pprint inductive-case-theorem)
 (clojure.pprint/pprint "")
 
-;; (prove
-;;  :induction-proof-sum '[forall 1 [succ :nat ?n] [equal [sum ?n] [/ [* ?n [+ 1 ?n]] 2]]]
-;;  [['induce 1 '[succ :nat ?n] [equal [sum ?n] [/ [* ?n [+ 1 ?n]] 2]]]]
-;;  inductive-case-theorem)
+(def induction-proven (prove
+                       :induction-proof-sum '[forall 1 [succ :nat ?n] [equal [sum ?n] [/ [* ?n [+ 1 ?n]] 2]]]
+                       [['induce '{?n 1} '{?n [succ :nat ?n]} '[equal [sum ?n] [/ [* ?n [+ 1 ?n]] 2]]]]
+                       inductive-case-theorem))
+
+
+(clojure.pprint/pprint "")
+(clojure.pprint/pprint induction-proven)
+(clojure.pprint/pprint "")
+
 
 
 ;; (unify '[+ ?a ?c]

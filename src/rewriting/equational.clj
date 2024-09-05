@@ -71,8 +71,11 @@
       bindings
       :otherwise
       (unify (rest s1) (rest s2) (unify (first s1) (first s2) bindings)))
-    (and (qvar? s1) (qvar? s2)) (add-binding s2 s1 (add-binding s1 s2 bindings))
+    (and (qvar? s1) (qvar? s2))
+    (add-binding s2 s1 (add-binding s1 s2 bindings))
     (qvar? s1) (add-binding s1 s2 bindings)
+    ;; (and (qvar? s1) (qvar? s2))
+    ;; (add-binding s2 s1 (add-binding s1 s2 bindings))
     (qvar? s2) (add-binding s2 s1 bindings)
     (= s1 s2) bindings
     :otherwise nil))
@@ -138,34 +141,34 @@
 (defn apply-rewrite [lhs rhs old-term]
   "Apply the rewrite rule holistically"
   (clojure.pprint/pprint "apply rewrite")
-  ;; (clojure.pprint/pprint lhs)
-  ;; (clojure.pprint/pprint rhs)
-  ;; (clojure.pprint/pprint old-term)
+  (clojure.pprint/pprint lhs)
+  (clojure.pprint/pprint rhs)
+  (clojure.pprint/pprint old-term)
 
   (when-let [bindings (breadth-first-unify lhs old-term {})]
-    ;; (clojure.pprint/pprint bindings)
+    (clojure.pprint/pprint bindings)
     (let [new-lhs (clojure.walk/postwalk-replace bindings lhs)
           new-rhs (clojure.walk/postwalk-replace bindings rhs)]
-      ;; (clojure.pprint/pprint new-lhs)
-      ;; (clojure.pprint/pprint new-rhs)
+      (clojure.pprint/pprint new-lhs)
+      (clojure.pprint/pprint new-rhs)
       (subst new-lhs new-rhs old-term))))
 
 (defn rewrite [sys command]
   "Find the subterm, apply the rewrite, slot the new subterm back in"
   (clojure.pprint/pprint "rewrite")
-  ;; (clojure.pprint/pprint command)
-  ;; (clojure.pprint/pprint (get-line-or-axiom sys (second command)))
+  (clojure.pprint/pprint command)
+  (clojure.pprint/pprint (get-line-or-axiom sys (second command)))
   (let [[_ lhs rhs] (get-line-or-axiom sys (second command))
         lhs-or-rhs (nth command 2)
         to-rewrite (get-line-or-axiom sys (nth command 3))
-        ;; _ (clojure.pprint/pprint to-rewrite)
+        _ (clojure.pprint/pprint to-rewrite)
         dive-point (nth command 4)
         subterm-old (dive to-rewrite dive-point)
         subterm-new (if (= lhs-or-rhs 'LHS)
                       (apply-rewrite lhs rhs subterm-old)
                       (apply-rewrite rhs lhs subterm-old))]
-    ;; (clojure.pprint/pprint subterm-new)
-    ;; (clojure.pprint/pprint to-rewrite)
+    (clojure.pprint/pprint subterm-new)
+    (clojure.pprint/pprint to-rewrite)
     
     (if (get-line-or-axiom sys (second command))
       (subst-at-point subterm-old subterm-new to-rewrite dive-point)
@@ -253,7 +256,10 @@
                    equation
                    'FAIL))}
           :facts
-          {:sum-1
+          {:commutativity-of-*
+           {:fact '[equal [* ?a ?b] [* ?b ?a]]
+            :proof :axiom}
+           :sum-1
            {:fact '[equal [sum 1] 1]
             :proof :axiom}
            :sum
@@ -262,15 +268,15 @@
            :order-1-2-succ
            {:fact '[equal [succ :nat 1] 2]
             :proof :axiom}
-           :order-1-2-pred
-           {:fact '[equal [pred :nat 2] 1]
-            :proof :axiom}
+           ;; :order-1-2-pred
+           ;; {:fact '[equal [pred :nat 2] 1]
+           ;;  :proof :axiom}
            :order-2-3-succ
            {:fact '[equal [succ :nat 2] 3]
             :proof :axiom}
-           :order-2-3-pred
-           {:fact '[equal [pred :nat 3] 2]
-            :proof :axiom}
+           ;; :order-2-3-pred
+           ;; {:fact '[equal [pred :nat 3] 2]
+           ;;  :proof :axiom}
            :div-n-n-1
            {:fact '[equal [/ ?n ?n] 1]
             :proof :axiom}
@@ -281,7 +287,19 @@
            {:fact '[equal [* 1 ?n] ?n]
             :proof :axiom}
            :quadratic-expansion
-           {:fact '[equal [* [+ ?a ?c] [+ ?b ?c]] [+ [* ?a ?b] [* ?a ?c] [* ?c ?b] [* ?c ?d]]]
+           {:fact '[equal [* [+ ?a ?c] [+ ?b ?d]] [+ [* ?a ?b] [* ?a ?d] [* ?c ?b] [* ?c ?d]]]
+            :proof :axiom}
+           :addition-expansion
+           {:fact '[equal [+ ?a [+ ?a ?c] ?c ?d] [+ [* 2 ?a] [* 2 ?c] ?d]]
+            :proof :axiom}
+           :division-by-two
+           {:fact '[equal [/ [+ [* 2 ?a] [* 2 ?b] ?c] 2] [+ [+ ?a ?b] [/ ?c 2]]]
+            :proof :axiom}
+           :sum-fact-def
+           {:fact '[equal [+ [+ 1 ?n] [sum n]] [sum [succ :nat n]]]
+            :proof :axiom}
+           :commutativity-of-equal
+           {:fact '[equal [equal ?a ?b] [equal ?b ?a]]
             :proof :axiom}
            }}))
 
@@ -289,25 +307,62 @@
 (clojure.pprint/pprint sum-1-theorem)
 (clojure.pprint/pprint "")
 
-;; (:sum-n-implies-n-plus-1-theorem
-;;  (:facts
-;;   (prove :sum-n-implies-n-plus-1-theorem '[implies
-;;                                            [equal [sum ?n] [/ [* ?n [+ 1 ?n]] 2]]
-;;                                            [equal [sum [succ :nat ?n]]
-;;                                             [/ [* [succ :nat ?n]
-;;                                                 [+ 1 [succ :nat ?n]]]
-;;                                              2]]]
-;;          ;; show equal to + n [/ [* ?n [+ 1 ?n]] 2]
-;;          [['assume '[equal [sum n] [/ [* n [+ 1 n]] 2]]]
-;;           ;; Construct intermediate symbol
-;;           ['construct 'X '[/ [* [succ :nat ?n]
-;;                               [+ 1 [succ :nat ?n]]]
-;;                            2]]
-;;           ;; Rewrite succ n to n + 1 in the formula
-;;           ['rewrite :1-plus-1 'RHS '*L2 nil]
-;;           ;; Quadratic-expansion
-;;           ['rewrite :quadratic-expansion 'LHS '*L3 nil]
-;;           ]
-;;          sum-1-theorem)))
+(def inductive-case-theorem
+  (:sum-n-implies-n-plus-1-theorem
+   (:facts
+    (prove :sum-n-implies-n-plus-1-theorem '[implies
+                                             [equal [sum ?n] [/ [* ?n [+ 1 ?n]] 2]]
+                                             [equal [sum [succ ?n]]
+                                              [/ [* [succ :nat ?n]
+                                                  [+ 1 [succ :nat ?n]]]
+                                               2]]]
+           ;; show equal to + n [/ [* ?n [+ 1 ?n]] 2]
+           [['assume '[equal [sum n] [/ [* n [+ 1 n]] 2]] ]
+            ;; Construct intermediate symbol
+            ['construct 'X '[/ [* [succ :nat n]
+                                [+ 1 [succ :nat n]]]
+                             2]]
+            ;; Rewrite succ n to n + 1 in the formula
+            ['rewrite :1-plus-1 'RHS '*L2 nil]
+            ;; Quadratic-expansion
+            ['rewrite :quadratic-expansion 'LHS '*L3 nil]
+            ['rewrite :commutativity-of-* 'LHS '*L4 (list 2 1 3)]
+            ['rewrite :1-*-n-n 'LHS '*L5 nil]
+            ['rewrite :1-*-n-n 'LHS '*L6 nil]
+            ['rewrite :1-*-n-n 'LHS '*L7 nil]
+            ['rewrite :addition-expansion 'LHS '*L8 nil]
+            ['rewrite :division-by-two 'LHS '*L9 nil]
+            ['rewrite '*L1 'RHS '*L10 (list 2 2)]
+            ['rewrite '*L2 'LHS '*L11 nil]
+            ['rewrite :sum-fact-def 'LHS '*L12 nil]
+            ['rewrite :commutativity-of-equal 'LHS '*L13 nil]
+            ;; ['rewrite '*L1 'RHS '*L11 nil]
+            ]
+           sum-1-theorem))))
 
 (clojure.pprint/pprint "")
+(clojure.pprint/pprint inductive-case-theorem)
+(clojure.pprint/pprint "")
+
+;; (prove
+;;  :induction-proof-sum '[forall 1 [succ :nat ?n] [equal [sum ?n] [/ [* ?n [+ 1 ?n]] 2]]]
+;;  [['induce 1 '[succ :nat ?n] [equal [sum ?n] [/ [* ?n [+ 1 ?n]] 2]]]]
+;;  inductive-case-theorem)
+
+
+;; (unify '[+ ?a ?c]
+;;        '[+ 1 ?n]
+;;        ;; '[+ [* ?a ?b] [* ?a ?c] [* ?c ?b] [* ?c ?d]]
+;;        {})
+
+;; (unify '[+ ?b ?c]
+;;        '[+ 1 [+1 ?n]]
+;;        ;; '[+ [* ?a ?b] [* ?a ?c] [* ?c ?b] [* ?c ?d]]
+;;        {})
+
+
+
+;; (unify '[* [+ ?a ?c] [+ ?b ?d]]
+;;        '[* [+ 1 ?n] [+ 1 [+ 1 ?n]]]
+;;        ;; '[+ [* ?a ?b] [* ?a ?c] [* ?c ?b] [* ?c ?d]]
+;;        {})

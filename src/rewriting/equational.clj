@@ -280,29 +280,34 @@
            :1-*-n-n
            {:fact '[equal [* 1 ?n] ?n]
             :proof :axiom}
+           :quadratic-expansion
+           {:fact '[equal [* [+ ?a ?c] [+ ?b ?c]] [+ [* ?a ?b] [* ?a ?c] [* ?c ?b] [* ?c ?d]]]
+            :proof :axiom}
            }}))
 
 (clojure.pprint/pprint "")
 (clojure.pprint/pprint sum-1-theorem)
 (clojure.pprint/pprint "")
 
-(:sum-n-implies-n-plus-1-theorem
- (:facts
-  (prove :sum-n-implies-n-plus-1-theorem '[implies
-                                           [equal [sum ?n] [/ [* ?n [+ 1 ?n]] 2]]
-                                           [equal [sum [succ :nat ?n]]
-                                            [/ [* [succ :nat ?n]
-                                                [+ 1 [succ :nat ?n]]]
-                                             2]]]
-         ;; show equal to + n [/ [* ?n [+ 1 ?n]] 2]
-         [['assume '[equal [sum n] [/ [* n [+ 1 n]] 2]]]
-          ;; Construct intermediate symbol
-          ['construct 'X '[/ [* [succ :nat ?n]
-                              [+ 1 [succ :nat ?n]]]
-                           2]]
-          
-          ['rewrite :1-plus-1 'RHS '*L2 nil]
-          ]
-         sum-1-theorem)))
+;; (:sum-n-implies-n-plus-1-theorem
+;;  (:facts
+;;   (prove :sum-n-implies-n-plus-1-theorem '[implies
+;;                                            [equal [sum ?n] [/ [* ?n [+ 1 ?n]] 2]]
+;;                                            [equal [sum [succ :nat ?n]]
+;;                                             [/ [* [succ :nat ?n]
+;;                                                 [+ 1 [succ :nat ?n]]]
+;;                                              2]]]
+;;          ;; show equal to + n [/ [* ?n [+ 1 ?n]] 2]
+;;          [['assume '[equal [sum n] [/ [* n [+ 1 n]] 2]]]
+;;           ;; Construct intermediate symbol
+;;           ['construct 'X '[/ [* [succ :nat ?n]
+;;                               [+ 1 [succ :nat ?n]]]
+;;                            2]]
+;;           ;; Rewrite succ n to n + 1 in the formula
+;;           ['rewrite :1-plus-1 'RHS '*L2 nil]
+;;           ;; Quadratic-expansion
+;;           ['rewrite :quadratic-expansion 'LHS '*L3 nil]
+;;           ]
+;;          sum-1-theorem)))
 
 (clojure.pprint/pprint "")

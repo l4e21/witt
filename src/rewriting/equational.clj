@@ -77,25 +77,27 @@
     (= s1 s2) bindings
     :otherwise nil))
 
-(defn depth-first-unify [s1 s2 bindings]
+(defn breadth-first-unify [s1 s2 bindings]
   "Left hand static, s2 depth first search for unification..."
-  (reduce
-   (fn [acc s2-subterm]
-     (clojure.pprint/pprint bindings)
-     (clojure.pprint/pprint s1)
-     (clojure.pprint/pprint s2-subterm)
-     (clojure.pprint/pprint (unify s1 s2-subterm {}))
-     (if (seq acc)
-       acc
-       (merge acc (if (coll? s2-subterm)
-                    (unify s1 s2-subterm (depth-first-unify s1 s2-subterm acc))
-                    nil))))
-   bindings
-   s2))
+  (or (unify s1 s2 bindings)
+      (reduce
+       (fn [acc s2-subterm]
+         ;; (clojure.pprint/pprint "breadth-first-unify reduce")
+         ;; (clojure.pprint/pprint acc)
+         ;; (clojure.pprint/pprint s1)
+         ;; (clojure.pprint/pprint s2-subterm)
+         (if (seq acc)
+           acc
+           (merge acc (if (coll? s2-subterm)
+                        (breadth-first-unify s1 s2-subterm acc)
+                        nil))))
+       bindings
+       s2)))
 
 ;; (unify '[or [elem ?e ?S1] [elem ?e ?S2]] '[or [elem 4 y] [elem 4 x]] {})
-(unify '[succ :nat ?n] '[succ :nat ?n] {})
-(depth-first-unify '[succ :nat ?n] '[+ [succ :nat ?n] [1 2 [succ :nat ?n]]] {})
+;; (unify '[succ :nat ?n] '[succ :nat ?n] {})
+(breadth-first-unify '[succ :nat ?n] '[+ [succ :nat ?n] [1 2 [succ :nat ?n]]] {})
+(breadth-first-unify '[succ :nat ?n] '[equal X [/ [* [succ :nat ?n] [+ 1 [succ :nat ?n]]] 2]] {})
 
 (defn dive [equation location]
   "Dive into a term's subterms a la ACL2"
@@ -135,27 +137,36 @@
 
 (defn apply-rewrite [lhs rhs old-term]
   "Apply the rewrite rule holistically"
+  (clojure.pprint/pprint "apply rewrite")
   ;; (clojure.pprint/pprint lhs)
   ;; (clojure.pprint/pprint rhs)
   ;; (clojure.pprint/pprint old-term)
 
-  (when-let [bindings (unify lhs old-term {})]
-    (do
-      ;; (clojure.pprint/pprint bindings)
-      (clojure.walk/prewalk-replace bindings rhs))))
+  (when-let [bindings (breadth-first-unify lhs old-term {})]
+    ;; (clojure.pprint/pprint bindings)
+    (let [new-lhs (clojure.walk/postwalk-replace bindings lhs)
+          new-rhs (clojure.walk/postwalk-replace bindings rhs)]
+      ;; (clojure.pprint/pprint new-lhs)
+      ;; (clojure.pprint/pprint new-rhs)
+      (subst new-lhs new-rhs old-term))))
 
 (defn rewrite [sys command]
   "Find the subterm, apply the rewrite, slot the new subterm back in"
+  (clojure.pprint/pprint "rewrite")
   ;; (clojure.pprint/pprint command)
+  ;; (clojure.pprint/pprint (get-line-or-axiom sys (second command)))
   (let [[_ lhs rhs] (get-line-or-axiom sys (second command))
         lhs-or-rhs (nth command 2)
         to-rewrite (get-line-or-axiom sys (nth command 3))
+        ;; _ (clojure.pprint/pprint to-rewrite)
         dive-point (nth command 4)
         subterm-old (dive to-rewrite dive-point)
         subterm-new (if (= lhs-or-rhs 'LHS)
                       (apply-rewrite lhs rhs subterm-old)
                       (apply-rewrite rhs lhs subterm-old))]
-
+    ;; (clojure.pprint/pprint subterm-new)
+    ;; (clojure.pprint/pprint to-rewrite)
+    
     (if (get-line-or-axiom sys (second command))
       (subst-at-point subterm-old subterm-new to-rewrite dive-point)
       'FAIL)))
@@ -188,152 +199,110 @@
       (update system :facts #(assoc % name {:fact equation :proof (:proof proof-attempt)})))))
 
 (clojure.pprint/pprint "")
-;; (clojure.pprint/pprint
-;;  (:elem-4-union-x-y
-;;   (:facts
-;;    (prove :elem-4-union-x-y '[elem 4 [union x y]]
-;;           ;; Commands
-;;           [['assume '[not [elem 4 [union x y]]]]
-;;            ['specify :union-defn '{?A 4 ?S1 x ?S2 y}]
-;;            ['evaluate '*L2 (list 1)]
-;;            ['rewrite '*L2 'LHS '*L3 nil]
-;;            ['contradict '*L4 '*L1]]
-;;           ;; Proof System
-;;           {:fns
-;;            ;; We do have to have some basic evaluator, just because FOL is required as a baseline for all of this work, and maybe the user wants to extend in the future.
-;;            {'or (fn [{:keys [axioms fns proof]} equation]
-;;                   (if (some (fn [clause] ((clojure.set/union
-;;                                           (set proof)
-;;                                           (set (map :fact (vals axioms))))
-;;                                          clause)) (rest equation))
-;;                     equation
-;;                     'FAIL))}
-;;            :facts
-;;            {:3-elem-x
-;;             {:fact '[elem 3 x]
-;;              :proof :axiom}
-;;             :4-elem-y
-;;             {:fact '[elem 4 y]
-;;              :proof :axiom}
-;;             :union-defn
-;;             {:fact '[equal
-;;                      [or [elem ?A ?S1] [elem ?A ?S2]]
-;;                      [elem ?A [union ?S1 ?S2]]]
-;;              :proof :axiom}}}))))
+(clojure.pprint/pprint
+ (:elem-4-union-x-y
+  (:facts
+   (prove :elem-4-union-x-y '[elem 4 [union x y]]
+          ;; Commands
+          [['assume '[not [elem 4 [union x y]]]]
+           ['specify :union-defn '{?A 4 ?S1 x ?S2 y}]
+           ['evaluate '*L2 (list 1)]
+           ['rewrite '*L2 'LHS '*L3 nil]
+           ['contradict '*L4 '*L1]]
+          ;; Proof System
+          {:fns
+           ;; We do have to have some basic evaluator, just because FOL is required as a baseline for all of this work, and maybe the user wants to extend in the future.
+           {'or (fn [{:keys [axioms fns proof]} equation]
+                  (if (some (fn [clause] ((clojure.set/union
+                                          (set proof)
+                                          (set (map :fact (vals axioms))))
+                                         clause)) (rest equation))
+                    equation
+                    'FAIL))}
+           :facts
+           {:3-elem-x
+            {:fact '[elem 3 x]
+             :proof :axiom}
+            :4-elem-y
+            {:fact '[elem 4 y]
+             :proof :axiom}
+            :union-defn
+            {:fact '[equal
+                     [or [elem ?A ?S1] [elem ?A ?S2]]
+                     [elem ?A [union ?S1 ?S2]]]
+             :proof :axiom}}}))))
 (clojure.pprint/pprint "")
 
 ;; Let's say we want to prove that the sum of the first n positive integers is equal to (n * (n + 1) / 2
+
+(def sum-1-theorem
+  (prove :sum-1-theorem '[equal [sum 1] [/ [* 1 [+ 1 1]] 2]]
+         ;; Commands
+         [['specify :div-n-n-1 '{?n 2}]
+          ['rewrite '*L1 'RHS :sum-1 (list 2)]
+          ['rewrite :1-*-n-n 'RHS '*L2 (list 2 1)]
+          ['rewrite :order-1-2-succ 'RHS '*L3 (list 2 1 2)]
+          ['rewrite :1-plus-1 'RHS '*L4 (list 2 1 2)]
+          ]
+         {:fns
+          {'or (fn [{:keys [axioms fns proof]} equation]
+                 (if (some (fn [clause] ((clojure.set/union
+                                         (set proof)
+                                         (set (map :fact (vals axioms))))
+                                        clause)) (rest equation))
+                   equation
+                   'FAIL))}
+          :facts
+          {:sum-1
+           {:fact '[equal [sum 1] 1]
+            :proof :axiom}
+           :sum
+           {:fact '[equal [sum ?a] [+ ?a [sum [pred :nat ?a]]]]
+            :proof :axiom}
+           :order-1-2-succ
+           {:fact '[equal [succ :nat 1] 2]
+            :proof :axiom}
+           :order-1-2-pred
+           {:fact '[equal [pred :nat 2] 1]
+            :proof :axiom}
+           :order-2-3-succ
+           {:fact '[equal [succ :nat 2] 3]
+            :proof :axiom}
+           :order-2-3-pred
+           {:fact '[equal [pred :nat 3] 2]
+            :proof :axiom}
+           :div-n-n-1
+           {:fact '[equal [/ ?n ?n] 1]
+            :proof :axiom}
+           :1-plus-1
+           {:fact '[equal [+ 1 ?n] [succ :nat ?n]]
+            :proof :axiom}
+           :1-*-n-n
+           {:fact '[equal [* 1 ?n] ?n]
+            :proof :axiom}
+           }}))
+
 (clojure.pprint/pprint "")
-;; (:sum-n-implies-n-plus-1-theorem
-;;  (:facts
-;;   (prove :sum-n-implies-n-plus-1-theorem '[implies
-;;                                            [equal [sum ?n] [/ [* ?n [+ 1 ?n]] 2]]
-;;                                            [equal [sum [succ :nat ?n]]
-;;                                             [/ [* [succ :nat ?n]
-;;                                                 [+ 1 [succ :nat ?n]]]
-;;                                              2]]]
-;;          ;; show equal to + n [/ [* ?n [+ 1 ?n]] 2]
-;;          [['assume '[equal [sum n] [/ [* n [+ 1 n]] 2]]]
-;;           ;; Construct intermediate symbol
-;;           ['construct 'X '[/ [* [succ :nat ?n]
-;;                               [+ 1 [succ :nat ?n]]]
-;;                            2]] 
-;;           ['rewrite :1-plus-1 'RHS '*L2 nil]
-;;           ]
-;;          (prove :sum-1-theorem '[equal [sum 1] [/ [* 1 [+ 1 1]] 2]]
-;;                 ;; Commands
-;;                 [['specify :div-n-n-1 '{?n 2}]
-;;                  ['rewrite '*L1 'RHS :sum-1 (list 2)]
-;;                  ['rewrite :1-*-n-n 'RHS '*L2 (list 2 1)]
-;;                  ['rewrite :order-1-2-succ 'RHS '*L3 (list 2 1 2)]
-;;                  ['rewrite :1-plus-1 'RHS '*L4 (list 2 1 2)]
-;;                  ]
-;;                 {:fns
-;;                  {'or (fn [{:keys [axioms fns proof]} equation]
-;;                         (if (some (fn [clause] ((clojure.set/union
-;;                                                 (set proof)
-;;                                                 (set (map :fact (vals axioms))))
-;;                                                clause)) (rest equation))
-;;                           equation
-;;                           'FAIL))}
-;;                  :facts
-;;                  {:sum-1
-;;                   {:fact '[equal [sum 1] 1]
-;;                    :proof :axiom}
-;;                   :sum
-;;                   {:fact '[equal [sum ?a] [+ ?a [sum [pred :nat ?a]]]]
-;;                    :proof :axiom}
-;;                   :order-1-2-succ
-;;                   {:fact '[equal [succ :nat 1] 2]
-;;                    :proof :axiom}
-;;                   :order-1-2-pred
-;;                   {:fact '[equal [pred :nat 2] 1]
-;;                    :proof :axiom}
-;;                   :order-2-3-succ
-;;                   {:fact '[equal [succ :nat 2] 3]
-;;                    :proof :axiom}
-;;                   :order-2-3-pred
-;;                   {:fact '[equal [pred :nat 3] 2]
-;;                    :proof :axiom}
-;;                   :div-n-n-1
-;;                   {:fact '[equal [/ ?n ?n] 1]
-;;                    :proof :axiom}
-;;                   :1-plus-1
-;;                   {:fact '[equal [+ 1 ?n] [succ :nat ?n]]
-;;                    :proof :axiom}
-;;                   :1-*-n-n
-;;                   {:fact '[equal [* 1 ?n] ?n]
-;;                    :proof :axiom}
-;;                   }}))))
-;; (:sum-n-up-to (:facts
-;;                (prove :sum-n-up-to '[for :nat [equal [sum ?n] [/ [* ?n [+ 1 ?n]] 2]]]
-;;                       ;; Commands
-;;                       [['assume '[/ [* ?n [+ 1 ?n]] 2]]
-;;                        ['specify '*L1 {'?n 1}]
-;;                        ['rewrite :1-plus-1 'LHS '*L2 (list 1 2)]
-;;                        ['rewrite :order-1-2-succ 'LHS '*L3 (list 1 2)]
-;;                        ['rewrite :1-*-n-n 'LHS '*L4 (list 1)]
-;;                        ['rewrite :div-n-n-1 'LHS '*L5 nil]
-;;                        ]
-;;                       ;; 1 works 
-;;                       ;; Proof System
-;;                       {:fns
-;;                        ;; We do have to have some basic evaluator, just because FOL is required as a baseline for all of this work, and maybe the user wants to extend in the future.
-;;                        {'or (fn [{:keys [axioms fns proof]} equation]
-;;                               (if (some (fn [clause] ((clojure.set/union
-;;                                                       (set proof)
-;;                                                       (set (map :fact (vals axioms))))
-;;                                                      clause)) (rest equation))
-;;                                 equation
-;;                                 'FAIL))}
-;;                        :facts
-;;                        {:sum-1
-;;                         {:fact '[equal [sum 1] 1]
-;;                          :proof :axiom}
-;;                         :sum
-;;                         {:fact '[equal [sum ?a] [+ ?a [sum [pred :nat ?a]]]]
-;;                          :proof :axiom}
-;;                         :order-1-2-succ
-;;                         {:fact '[equal [succ :nat 1] 2]
-;;                          :proof :axiom}
-;;                         :order-1-2-pred
-;;                         {:fact '[equal [pred :nat 2] 1]
-;;                          :proof :axiom}
-;;                         :order-2-3-succ
-;;                         {:fact '[equal [succ :nat 2] 3]
-;;                          :proof :axiom}
-;;                         :order-2-3-pred
-;;                         {:fact '[equal [pred :nat 3] 2]
-;;                          :proof :axiom}
-;;                         :div-n-n-1
-;;                         {:fact '[equal [/ ?n ?n] 1]
-;;                          :proof :axiom}
-;;                         :1-plus-1
-;;                         {:fact '[equal [+ 1 ?n] [succ :nat ?n]]
-;;                          :proof :axiom}
-;;                         :1-*-n-n
-;;                         {:fact '[equal [* 1 ?n] ?n]
-;;                          :proof :axiom}
-;;                         }})))
+(clojure.pprint/pprint sum-1-theorem)
+(clojure.pprint/pprint "")
+
+(:sum-n-implies-n-plus-1-theorem
+ (:facts
+  (prove :sum-n-implies-n-plus-1-theorem '[implies
+                                           [equal [sum ?n] [/ [* ?n [+ 1 ?n]] 2]]
+                                           [equal [sum [succ :nat ?n]]
+                                            [/ [* [succ :nat ?n]
+                                                [+ 1 [succ :nat ?n]]]
+                                             2]]]
+         ;; show equal to + n [/ [* ?n [+ 1 ?n]] 2]
+         [['assume '[equal [sum n] [/ [* n [+ 1 n]] 2]]]
+          ;; Construct intermediate symbol
+          ['construct 'X '[/ [* [succ :nat ?n]
+                              [+ 1 [succ :nat ?n]]]
+                           2]]
+          
+          ['rewrite :1-plus-1 'RHS '*L2 nil]
+          ]
+         sum-1-theorem)))
 
 (clojure.pprint/pprint "")

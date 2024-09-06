@@ -147,34 +147,34 @@
 (defn apply-rewrite [lhs rhs old-term]
   "Apply the rewrite rule holistically"
   (clojure.pprint/pprint "apply rewrite")
-  (clojure.pprint/pprint lhs)
-  (clojure.pprint/pprint rhs)
-  (clojure.pprint/pprint old-term)
+  ;; (clojure.pprint/pprint lhs)
+  ;; (clojure.pprint/pprint rhs)
+  ;; (clojure.pprint/pprint old-term)
 
   (when-let [bindings (breadth-first-unify lhs old-term {})]
-    (clojure.pprint/pprint bindings)
+    ;; (clojure.pprint/pprint bindings)
     (let [new-lhs (clojure.walk/postwalk-replace bindings lhs)
           new-rhs (clojure.walk/postwalk-replace bindings rhs)]
-      (clojure.pprint/pprint new-lhs)
-      (clojure.pprint/pprint new-rhs)
+      ;; (clojure.pprint/pprint new-lhs)
+      ;; (clojure.pprint/pprint new-rhs)
       (subst new-lhs new-rhs old-term))))
 
 (defn rewrite [sys command]
   "Find the subterm, apply the rewrite, slot the new subterm back in"
   (clojure.pprint/pprint "rewrite")
-  (clojure.pprint/pprint command)
-  (clojure.pprint/pprint (get-line-or-axiom sys (second command)))
+  ;; (clojure.pprint/pprint command)
+  ;; (clojure.pprint/pprint (get-line-or-axiom sys (second command)))
   (let [[_ lhs rhs] (get-line-or-axiom sys (second command))
         lhs-or-rhs (nth command 2)
         to-rewrite (get-line-or-axiom sys (nth command 3))
-        _ (clojure.pprint/pprint to-rewrite)
+        ;; _ (clojure.pprint/pprint to-rewrite)
         dive-point (nth command 4)
         subterm-old (dive to-rewrite dive-point)
         subterm-new (if (= lhs-or-rhs 'LHS)
                       (apply-rewrite lhs rhs subterm-old)
                       (apply-rewrite rhs lhs subterm-old))]
-    (clojure.pprint/pprint subterm-new)
-    (clojure.pprint/pprint to-rewrite)
+    ;; (clojure.pprint/pprint subterm-new)
+    ;; (clojure.pprint/pprint to-rewrite)
     
     (if (get-line-or-axiom sys (second command))
       (subst-at-point subterm-old subterm-new to-rewrite dive-point)
@@ -185,6 +185,7 @@
   ['equal (second command) (nth command 2)])
 
 (defn induce [sys command]
+  "Induction requires proof of the base case, some way of connecting terms in a tree (partial ordering), and the proof of the inductive case. Here we use disjointed sets."
   (clojure.pprint/pprint "Proving theorem by induction") 
   ;; (clojure.pprint/pprint command)
   (let [base-bindings (second command)
@@ -203,10 +204,45 @@
                                delta-bindings)]
     (if (and (seq (find-by-equation sys base-case))
              (seq (find-by-equation sys ['implies theorem inductive-case])))
-      theorem)))
+      ['forall base-bindings delta-bindings theorem])))
+
+(defn find-element-in-poset [sys base delta k v]
+  "Traverse from base out to see if the value is connected to it via the relation delta AKA it is valid for induction"
+  (clojure.pprint/pprint "Traversing relations graph")
+  ;; (clojure.pprint/pprint base)
+  ;; (clojure.pprint/pprint delta)
+  ;; (clojure.pprint/pprint (first (find-by-equation sys ['equal (subst k base delta) v])))
+  (or (first (find-by-equation sys ['equal (subst k base delta) v]))
+      (reduce
+       (fn [acc {:keys [fact]}]
+         (or acc
+             (let [bindings (unify ['equal (subst k base delta) k]
+                                   fact
+                                   {})]
+               (if bindings
+                 (find-element-in-poset sys (get bindings k) delta k v)
+                 nil))))
+       nil
+       (vals (:axioms sys)))
+      (let [nodes (filter (fn [{:keys [fact]}]
+                            (unify ['equal (subst k base delta) k]
+                                   fact
+                                   {}))
+                          (vals (:axioms sys)))]
+        (if (empty? nodes)
+          false
+          (some #(find-element-in-poset sys )))
+        nodes)))
 
 (defn apply-induction [sys command]
-  (let ))
+  "To apply induction, apply the inductive rule to a term, verifying that the term is connected to the base term by the inductive step"
+  (let [[_ base-bindings delta-bindings theorem] (get-line-or-axiom sys (second command))
+        valid-inductive-case? (every? (fn [[k v]]
+                                        (let [base-binding (get base-bindings k)
+                                              delta-binding (get delta-bindings k)]
+                                          (find-element-in-poset sys base-binding delta-binding k v)))
+                                      (nth command 2))]
+    (clojure.walk/postwalk-replace (nth command 2) theorem)))
 
 (defn prove [name equation commands system]
   "Proof dispatch"
@@ -223,7 +259,8 @@
                      rewrite (rewrite sys command)
                      construct (construct sys command)
                      induce (induce sys command)
-                     sys)]
+                     apply-induction (apply-induction sys command)
+                     'FAIL)]
                (update sys :proof #(conj % {:command command
                                             :step proof-step})))))
          {:fns (:fns system) :axioms (:facts system) :proof []}
@@ -335,7 +372,7 @@
            }}))
 
 (clojure.pprint/pprint "")
-(clojure.pprint/pprint sum-1-theorem)
+(clojure.pprint/pprint (:sum-1-theorem (:facts sum-1-theorem)))
 (clojure.pprint/pprint "")
 
 (def inductive-case-theorem
@@ -370,19 +407,29 @@
          sum-1-theorem))
 
 (clojure.pprint/pprint "")
-(clojure.pprint/pprint inductive-case-theorem)
+(clojure.pprint/pprint (:sum-n-implies-n-plus-1-theorem (:facts inductive-case-theorem)))
 (clojure.pprint/pprint "")
 
 (def induction-proven (prove
-                       :induction-proof-sum '[forall 1 [succ :nat ?n] [equal [sum ?n] [/ [* ?n [+ 1 ?n]] 2]]]
+                       :induction-sum '[forall {?n 1} {?n [succ :nat ?n]} [equal [sum ?n] [/ [* ?n [+ 1 ?n]] 2]]]
                        [['induce '{?n 1} '{?n [succ :nat ?n]} '[equal [sum ?n] [/ [* ?n [+ 1 ?n]] 2]]]]
                        inductive-case-theorem))
 
 
 (clojure.pprint/pprint "")
-(clojure.pprint/pprint induction-proven)
+(clojure.pprint/pprint (:induction-sum (:facts induction-proven)))
 (clojure.pprint/pprint "")
 
+(def applied-induction
+  (prove
+   :sum-of-3-equal-3-*-4-over-2
+   '[equal [sum 3] [/ [* 3 4] 2]]
+   [['apply-induction :induction-sum '{?n 3}]]
+   induction-proven))
+
+(clojure.pprint/pprint "")
+(clojure.pprint/pprint (:sum-of-3-equal-3-*-4-over-2 (:facts applied-induction)))
+(clojure.pprint/pprint "")
 
 
 ;; (unify '[+ ?a ?c]

@@ -107,7 +107,7 @@ We can prove this via induction. We can prove the base case as follows.
 ['rewrite :1-*-n-n 'RHS '*L2 (list 2 1)]
 ['rewrite :order-1-2-succ 'RHS '*L3 (list 2 1 2)]
 ['rewrite :1-plus-1 'RHS '*L4 (list 2 1 2)]
-          ```
+```
 
 In a few cases, rewrites have to be rather ugly because so far we don't have arbitrary commutativity and associativity rules for addition... perhaps we might prove *this* via induction in the future!
 

@@ -51,7 +51,7 @@ Commands:
 
 We might have the following proof system
 
-```
+```clojure
 {:3-elem-x
  {:fact '[elem 3 x]
   :proof :axiom}
@@ -97,11 +97,11 @@ Suppose we want to prove that the sum of the first n natural numbers is equal to
 
 We can prove this via induction. We can prove the base case as follows.
 
-```
+```clojure
 '[equal [sum 1] [/ [* 1 [+ 1 1]] 2]]
 ```
 
-```
+```clojure
 ['specify :div-n-n-1 '{?n 2}]
 ['rewrite '*L1 'RHS :sum-1 (list 2)]
 ['rewrite :1-*-n-n 'RHS '*L2 (list 2 1)]
@@ -111,7 +111,7 @@ We can prove this via induction. We can prove the base case as follows.
 
 In a few cases, rewrites have to be rather ugly because so far we don't have arbitrary commutativity and associativity rules for addition... perhaps we might prove *this* via induction in the future!
 
-```
+```clojure
 {:fact [equal [sum 1] [/ [* 1 [+ 1 1]] 2]],
  :proof
  [{:command [specify :div-n-n-1 {?n 2}], :step [equal [/ 2 2] 1]}
@@ -127,7 +127,7 @@ In a few cases, rewrites have to be rather ugly because so far we don't have arb
 
 Great. Now for the inductive case.
 
-```
+```clojure
 [implies
   [equal [sum ?n] [/ [* ?n [+ 1 ?n]] 2]]
   [equal
@@ -135,7 +135,7 @@ Great. Now for the inductive case.
    [/ [* [succ :nat ?n] [+ 1 [succ :nat ?n]]] 2]]]
 ```
 
-```
+```clojure
 ['assume '[equal [sum n] [/ [* n [+ 1 n]] 2]]]
 ;; Construct intermediate symbol
 ['construct 'X '[/ [* [succ :nat n] [+ 1 [succ :nat n]]] 2]]
@@ -156,7 +156,7 @@ Great. Now for the inductive case.
 ['rewrite :commutativity-of-equal 'LHS '*L13 nil]
 ```
 
-```
+```clojure
 {:fact
  [implies
   [equal [sum ?n] [/ [* ?n [+ 1 ?n]] 2]]
@@ -209,12 +209,12 @@ A long-ish result, but much much shorter than anything you'll get out of ACL2!
 
 Now the fun part. We have our base & inductive cases, so all we need to do now is construct the inductive assertion.
 
-```
+```clojure
 '[forall {?n 1} {?n [succ :nat ?n]} [equal [sum ?n] [/ [* ?n [+ 1 ?n]] 2]]]             
 ```
 
 
-```
+```clojure
 [['induce '{?n 1} '{?n [succ :nat ?n]} '[equal [sum ?n] [/ [* ?n [+ 1 ?n]] 2]]]]         
 ```
 
@@ -226,20 +226,20 @@ How do we apply this rule, then? What happens behind the scenes? This is the mos
 
 Say we want to prove 
 
-```
+```clojure
 '[equal [sum 3] [/ [* 3 4] 2]]
 ```
 
 We can apply the induction using `apply-induction`.
 
-```
+```clojure
 ['apply-induction :induction-sum '{?n 3}]
 ```
 
 This takes a map of bindings and the inductive rule, and from the base-case, searches using the inductive rule's step-function in order to check whether the base is connected to the value by that step-function. If so, by definition the induction **must** apply. Amazingly simple and yields a very simple one-line proof.
 
 
-```
+```clojure
 {:fact [equal [sum 3] [/ [* 3 4] 2]],
  :proof
  [{:command [apply-induction :induction-sum {?n 3}],

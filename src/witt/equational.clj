@@ -1,5 +1,5 @@
-(ns rewriting.equational
-  "Rewriting system to aid with visibility and debugging of proofs. NOT an automatic theorem prover, just a rewriting tool + proof validation")
+(ns witt.equational
+  "")
 
 (defn qvar? [x]
   "A la PAIP"

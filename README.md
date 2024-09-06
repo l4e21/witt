@@ -1,5 +1,5 @@
 
-Equational term-rewriting system to aid with visibility and debugging of proofs. NOT an automatic theorem prover, just a rewriting tool for pedagogical proof validation
+A purely-relational term-rewriting system to aid with debugging of proofs. NOT an automatic theorem prover, just a rewriting tool for pedagogical proof validation
 
 ## TODO
 

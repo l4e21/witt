@@ -1,0 +1,106 @@
+
+* Prolog Version of Witt
+
+** Justification
+
+- Prolog search should relieve burden of procedural searches
+- In-memory storage of predicates fits naturally
+- Prolog is terser, should lead to smaller core
+- Can load in predicates dynamically. New assumptions easy to make
+
+** Model
+In the clojure system, Witt was pretty expressive but did not have many safety checks, and was made up by the following model
+
+System = {:facts Dict<Keyword, Fact>,
+          :fns Dict<Symbol, Fn}
+
+Fact = {:fact Expression
+        :proof Proof // :axiom}
+
+Expression = List<Symbol>
+
+Proof = List<{:command Command
+              :step System}>
+
+Command = List<Symbol>
+
+Within commands and expressions, one could refer to previous lines of the proof via *Ln or via keyword ref to a fact. Intermediate symbols also existed which could be constructed
+
+The proof engine contained the following dispatches
+
+assume - Simply add this fact to the list of facts (maybe it needs some?)
+specify - Make this predicate more specific (should we also have some way to generalise?)
+evaluate - Run an evaluator against some part of this fact
+rewrite - Perform a term rewrite (can rewrite a subterm and do unification)
+construct - Perform a valid construction of an intermediate symbol
+induce - Perform induction given a base case and a successor fn 
+apply induction - Apply induction by searching through disjointed po sets using successor fn and base case of a proven inductive fact
+
+There are probably many simplifications that can be made here. For example, many areas are probably unsafe (find examples?). Not happy with construction/evaluation. There are not many checks on statements being well-formed
+
+How might this translate to a Prolog model?
+
+Facts would exist in the knowledge base as `fact` predicates on a system. E.G.,
+
+fact(Name, RequiredFacts, RequiredFns, body:Body, proof:axiom)
+fact(Name, RequiredFacts, RequiredFns, body:Body, proof:Commands)
+
+RequiredFacts is a list of names.
+facts can be composed together into systems
+
+or([T|Ts]) :- ...
+fact(1, [], [], [equal [or [elem ?A ?S1] [elem ?A ?S2]]
+                       [elem ?A [union ?S1 ?S2]]], :proof :axiom)
+fact(4, [[elem 4 x], [elem 4 y], 1], [elem 4 [union x y]], :proof [...])
+
+How can we manage side effects? What does it look like to do a side effect? Let's not worry about this yet maybe. 
+
+Should be fine to have contradictions globally as long as they dont exist locally.
+But checking locally can still be tough since contradictions can be inferred.
+
+so we might interact like
+prove(Id, From, To, Proof)
+
+dep(c1, elem(x, 4))
+
+_implies(1, none, p)
+_implies(2, p, q)
+prove(3, [2, 1], r, [...])
+
+Not happy with this. let's go back to first principles.
+
+fact(Frame, Id, Body).
+
+a proof step is
+
+assume([1], elem(x, 4)) -> fact([1], elem(x, 4)).
+assume([2], elem(y, 6)) -> fact([2], elem(y, 6)).
+assume([3], equal(or(elem(?A, ?S1), elem(?A, ?S2)), elem(?A, union(?S1, ?S2)))).
+->
+fact([3], equal(or(elem(?A, ?S1), elem(?A, ?S2)), elem(?A, union(?S1, ?S2)))).
+
+specify([4], [3], Bindings). -> fact([4], equal(or(elem(x, 4), elem(y, 4)), elem(union(x, y), 4))).
+
+evaluate([5], [0, 1]). (diving in and evaluating)
+->
+fact([5], equal(true, elem(union(x, y), 4))).
+(...)
+
+Proof steps are themselves proven by producing a new frame.
+
+Frames can be produced to make subproofs
+assume([1, 1], elem(x, ?A)) -> fact([1, 1], elem(x, ?A)).
+specify([1], [1, 1], Bindings) -> fact([1, 2], elem(x, 4)).
+
+Which I can then use to produce new knowledge 
+
+How to represent vars?
+
+Prolog does not store variables at runtime
+
+%@ I = [3],
+%@ Body = equal(or(elem(_, _A), elem(_, _A)), elem(union(x, y), 4)),
+%@ Command = axiom.
+%@ elem(x,4)[]elem(y,6)[]equal(or(elem(_596,_598),elem(_602,_598)),elem(union(x,y),4))
+
+How can we manage side effects? What does it look like to do a side effect? Let's not worry about this yet maybe.

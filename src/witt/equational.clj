@@ -282,7 +282,7 @@
            ['contradict '*L4 '*L1]]
           ;; Proof System
           {:fns
-           ;; We do have to have some basic evaluator, just because FOL is required as a baseline for all of this work, and maybe the user wants to extend in the future.
+           ;; We do have to have some basic native evaluators, because FOL + side effects are required as a baseline for all of this work, and maybe the user wants to extend in the future.
            {'or (fn [{:keys [axioms fns proof]} equation]
                   (if (some (fn [clause] ((clojure.set/union
                                           (set proof)
